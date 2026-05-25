@@ -15,6 +15,16 @@ vi.mock("../../src/api/servicios.api", () => ({
   getServiciosRequest: vi.fn(),
 }));
 
+vi.mock("../../src/hooks/useFormDraft", () => ({
+  useFormDraft: () => ({
+    hasDraft: false,
+    lastSavedAt: "",
+    lastSavedLabel: "",
+    restoreDraft: vi.fn(),
+    clearDraft: vi.fn(),
+  }),
+}));
+
 import {
   getClientesRequest,
   getPropiedadesByClienteRequest,

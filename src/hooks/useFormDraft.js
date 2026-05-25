@@ -68,6 +68,7 @@ export const useFormDraft = ({
     () => resolveDraftStorageKey({ storageKey, userScope }),
     [storageKey, userScope]
   );
+  const serializedValues = useMemo(() => JSON.stringify(values), [values]);
   const [draftMeta, setDraftMeta] = useState(() => {
     if (!enabled || typeof window === "undefined") {
       return { hasDraft: false, lastSavedAt: "" };
@@ -105,7 +106,7 @@ export const useFormDraft = ({
         resolvedStorageKey,
         JSON.stringify({
           savedAt,
-          values,
+          values: JSON.parse(serializedValues),
         })
       );
       setDraftMeta({ hasDraft: true, lastSavedAt: savedAt });
@@ -114,7 +115,7 @@ export const useFormDraft = ({
     return () => {
       window.clearTimeout(timeoutRef.current);
     };
-  }, [delayMs, enabled, resolvedStorageKey, values]);
+  }, [delayMs, enabled, resolvedStorageKey, serializedValues]);
 
   const restoreDraft = (onRestore) => {
     if (!enabled || typeof window === "undefined") return false;

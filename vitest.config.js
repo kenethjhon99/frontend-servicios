@@ -8,6 +8,8 @@ export default defineConfig({
     globals: false,
     setupFiles: ["./tests/setup.js"],
     include: ["tests/**/*.test.{js,jsx}"],
+    testTimeout: 15000,
+    hookTimeout: 15000,
     css: false,
     coverage: {
       provider: "v8",

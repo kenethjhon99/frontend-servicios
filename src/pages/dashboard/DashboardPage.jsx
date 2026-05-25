@@ -56,7 +56,7 @@ const buildCurrentMonthRange = () => {
 };
 
 const formatShortDate = (value) => {
-  const [year, month, day] = String(value).slice(0, 10).split("-");
+  const [, month, day] = String(value).slice(0, 10).split("-");
   return `${month}/${day}`;
 };
 
@@ -177,57 +177,6 @@ const DashboardChartCard = ({ eyebrow, title, description, children }) => (
     <div className="mt-5">{children}</div>
   </article>
 );
-
-const MetricLineChart = ({ items }) => {
-  const values = items.map((item) => item.raw);
-  const path = buildLinePath(values);
-
-  return (
-    <div className="rounded-[1.5rem] border border-slate-200/70 bg-slate-50/80 p-4">
-      <div className="overflow-hidden rounded-2xl bg-white px-4 py-5 shadow-sm">
-        <svg viewBox="0 0 100 42" className="h-32 w-full" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="dashboardLineGradient" x1="0%" x2="100%" y1="0%" y2="0%">
-              <stop offset="0%" stopColor="#0ea5e9" />
-              <stop offset="50%" stopColor="#14b8a6" />
-              <stop offset="100%" stopColor="#22c55e" />
-            </linearGradient>
-          </defs>
-          <path
-            d="M 0 40 H 100"
-            fill="none"
-            stroke="rgba(148, 163, 184, 0.32)"
-            strokeDasharray="3 3"
-            strokeWidth="0.8"
-          />
-          <path d={path} fill="none" stroke="url(#dashboardLineGradient)" strokeWidth="2.8" />
-          {items.map((item, index) => {
-            const x = items.length === 1 ? 50 : (index * 100) / (items.length - 1);
-            const max = Math.max(...values, 1);
-            const y = 36 - (item.raw / max) * 36;
-            return (
-              <g key={item.key}>
-                <circle cx={x} cy={y} r="2.7" fill="#0f172a" />
-                <circle cx={x} cy={y} r="1.4" fill="#ffffff" />
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        {items.map((item) => (
-          <div key={item.key} className="rounded-2xl bg-white px-4 py-3 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-              {item.title}
-            </p>
-            <p className="mt-2 text-xl font-semibold text-slate-900">{item.raw}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
 
 const MixBarChart = ({ items }) => {
   const total = items.reduce((acc, item) => acc + item.raw, 0) || 1;

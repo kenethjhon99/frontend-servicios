@@ -59,7 +59,9 @@ const CotizacionesPage = () => {
       try {
         const { data } = await getClientesRequest({ estado: "ACTIVO" });
         setClientes(Array.isArray(data) ? data : []);
-      } catch (_error) {}
+      } catch (_error) {
+        setClientes([]);
+      }
     };
 
     loadClientes();

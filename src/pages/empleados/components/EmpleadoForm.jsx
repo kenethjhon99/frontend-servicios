@@ -58,6 +58,7 @@ const EmpleadoForm = ({ initialData = null, onSubmit, onCancel, loading = false,
     }
 
     onSubmit({
+      id_cuadrilla: initialData?.id_cuadrilla || null,
       nombre_completo: form.nombre_completo.trim(),
       telefono: form.telefono.trim() || null,
       correo: form.correo.trim() || null,

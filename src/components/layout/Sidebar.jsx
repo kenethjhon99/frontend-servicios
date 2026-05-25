@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../../context/auth.context";
 import { useI18n } from "../../context/i18n.context";
-import { preloadRouteChunk } from "../../routes/AppRouter";
+import { preloadRouteChunk } from "../../routes/routePreload";
 import { menuByRole } from "../../utils/permissions";
 
 const ICON_BY_PATH = {

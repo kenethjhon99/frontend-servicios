@@ -185,7 +185,7 @@ const AgendaSemanalPage = () => {
     return Array.from(byDate.values()).sort((a, b) => a.fecha.localeCompare(b.fecha));
   }, [data, filters.fecha_desde, filters.fecha_hasta, ownerFilter]);
 
-  const ownerOptions = useMemo(() => {
+  const ownerOptions = (() => {
     const map = new Map();
     (data?.programaciones || []).forEach((row) => {
       if (row.id_empleado_responsable && row.empleado_responsable) {
@@ -196,7 +196,7 @@ const AgendaSemanalPage = () => {
       { value: "ALL", label: t("agenda.allOwners") },
       ...Array.from(map.entries()).map(([value, label]) => ({ value, label })),
     ];
-  }, [data, t]);
+  })();
 
   const weekFilterOptions = useMemo(
     () =>
@@ -249,7 +249,7 @@ const AgendaSemanalPage = () => {
     };
   }, [data, visibleDays]);
 
-  const ownerSummary = useMemo(() => {
+  const ownerSummary = (() => {
     const map = new Map();
     const filteredProgramaciones = (data?.programaciones || []).filter(
       (row) =>
@@ -305,7 +305,7 @@ const AgendaSemanalPage = () => {
         };
       })
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [data, ownerFilter, t]);
+  })();
 
   return (
     <div className="space-y-6">

@@ -15,6 +15,16 @@ vi.mock("../../src/api/servicios.api", () => ({
   getServiciosRequest: vi.fn(),
 }));
 
+vi.mock("../../src/hooks/useFormDraft", () => ({
+  useFormDraft: () => ({
+    hasDraft: false,
+    lastSavedAt: "",
+    lastSavedLabel: "",
+    restoreDraft: vi.fn(),
+    clearDraft: vi.fn(),
+  }),
+}));
+
 import {
   getClientesRequest,
   getPropiedadesByClienteRequest,
@@ -88,7 +98,7 @@ describe("ProgramacionForm", () => {
     await userEvent.click(screen.getByRole("button", { name: /Siguiente/i }));
 
     await userEvent.selectOptions(
-      screen.getByRole("combobox", { name: /Empleado responsable/i }),
+      screen.getByRole("combobox", { name: /Responsable|Owner/i }),
       "20"
     );
     await userEvent.type(screen.getByPlaceholderText(/Precio acordado/i), "250");
