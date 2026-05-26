@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getAgendaDiaRequest } from "../../api/agenda.api";
 import {
-  generarEjecucionProgramacionRequest,
+  getAgendaDiaRequest,
+  marcarOrdenNoRealizadaAgendaRequest,
+  reprogramarOrdenAgendaRequest,
+} from "../../api/agenda.api";
+import {
+  generarOrdenDesdeProgramacionRequest,
   generarOrdenDesdeEjecucionProgramacionRequest,
 } from "../../api/programaciones.api";
 import { changeEstadoOrdenRequest } from "../../api/ordenes.api";
+import { createCreditoRequest, createPagoRequest } from "../../api/pagos.api";
 import EmptyState from "../../components/common/EmptyState";
 import Loader from "../../components/common/Loader";
 import StatCard from "../../components/common/StatCard";
@@ -31,6 +36,7 @@ const signalBadgeStyles = {
 };
 
 const QUICK_FILTERS = ["ALL", "WITHOUT_VISIT", "WITHOUT_ORDER", "WITH_ORDER", "OVERDUE"];
+const PAYMENT_METHODS = ["EFECTIVO", "TRANSFERENCIA", "DEPOSITO", "CHEQUE", "TARJETA", "OTRO"];
 
 const matchesScheduleFilter = (row, filter, isOverdue) => {
   switch (filter) {
@@ -61,6 +67,23 @@ const AgendaHoyPage = () => {
   const [quickFilter, setQuickFilter] = useState("ALL");
   const [responsableFilter, setResponsableFilter] = useState("ALL");
   const [error, setError] = useState("");
+  const [cobroOrden, setCobroOrden] = useState(null);
+  const [servicioOrden, setServicioOrden] = useState(null);
+  const [servicioForm, setServicioForm] = useState({
+    accion: "REALIZADO",
+    nueva_fecha: "",
+    motivo: "",
+  });
+  const [reprogramacionPreview, setReprogramacionPreview] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [cobroForm, setCobroForm] = useState({
+    tipo: "PAGADO",
+    metodo_pago: "EFECTIVO",
+    monto: "",
+    referencia_pago: "",
+    dias_credito: "15",
+    observaciones: "",
+  });
 
   const loadAgenda = async (targetDate = fecha) => {
     try {
@@ -87,14 +110,14 @@ const AgendaHoyPage = () => {
     setSearchParams({ fecha });
   };
 
-  const handleGenerarVisita = async (row) => {
+  const handleGenerarOrden = async (row) => {
     try {
       setActionLoading(true);
-      await generarEjecucionProgramacionRequest(row.id_programacion);
-      toast.success(t("agenda.generateVisitSuccess"));
+      await generarOrdenDesdeEjecucionProgramacionRequest(row.id_ejecucion_dia);
+      toast.success(t("agenda.generateOrderSuccess"));
       await loadAgenda(fecha);
     } catch (err) {
-      const message = err?.response?.data?.error || t("agenda.generateVisitError");
+      const message = err?.response?.data?.error || t("agenda.generateOrderError");
       setError(message);
       toast.error(message);
     } finally {
@@ -102,10 +125,10 @@ const AgendaHoyPage = () => {
     }
   };
 
-  const handleGenerarOrden = async (row) => {
+  const handleGenerarOrdenDirecta = async (row) => {
     try {
       setActionLoading(true);
-      await generarOrdenDesdeEjecucionProgramacionRequest(row.id_ejecucion_dia);
+      await generarOrdenDesdeProgramacionRequest(row.id_programacion);
       toast.success(t("agenda.generateOrderSuccess"));
       await loadAgenda(fecha);
     } catch (err) {
@@ -127,6 +150,148 @@ const AgendaHoyPage = () => {
       await loadAgenda(fecha);
     } catch (err) {
       const message = err?.response?.data?.error || t("agenda.startOrderError");
+      setError(message);
+      toast.error(message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const openCobroModal = (row) => {
+    setCobroOrden(row);
+    setCobroForm({
+      tipo: "PAGADO",
+      metodo_pago: "EFECTIVO",
+      monto: String(Number(row.total_orden || 0).toFixed(2)),
+      referencia_pago: "",
+      dias_credito: "15",
+      observaciones: "",
+    });
+  };
+
+  const openServicioModal = (row) => {
+    setServicioOrden(row);
+    setReprogramacionPreview(null);
+    setServicioForm({
+      accion: "REALIZADO",
+      nueva_fecha: "",
+      motivo: "",
+    });
+  };
+
+  const normalizeScheduleOrder = (row) => ({
+    ...row,
+    id_orden_trabajo: row.id_orden_trabajo_visita,
+    numero_orden: row.numero_orden_visita || `Orden #${row.id_orden_trabajo_visita}`,
+    estado: row.estado_orden_visita || "PROGRAMADA",
+    total_orden: row.total_orden_visita ?? row.precio_acordado ?? 0,
+    estado_cobro: row.estado_cobro_visita || "NO_COBRADO",
+  });
+
+  const loadReprogramacionPreview = async (targetDate) => {
+    if (!targetDate) {
+      setReprogramacionPreview(null);
+      return;
+    }
+
+    try {
+      setPreviewLoading(true);
+      const agenda = await getAgendaDiaRequest(targetDate);
+      setReprogramacionPreview(agenda);
+    } catch (_err) {
+      setReprogramacionPreview(null);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleServicioSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!servicioOrden) return;
+
+    try {
+      setActionLoading(true);
+
+      if (servicioForm.accion === "REALIZADO") {
+        await changeEstadoOrdenRequest(servicioOrden.id_orden_trabajo, {
+          estado: "COMPLETADA",
+        });
+        toast.success("Servicio marcado como realizado");
+      }
+
+      if (servicioForm.accion === "REPROGRAMAR") {
+        await reprogramarOrdenAgendaRequest(servicioOrden.id_orden_trabajo, {
+          nueva_fecha: servicioForm.nueva_fecha,
+          motivo_reprogramacion: servicioForm.motivo || "Reprogramado desde agenda",
+        });
+        toast.success("Servicio reprogramado");
+      }
+
+      if (servicioForm.accion === "NO_REALIZADO") {
+        await marcarOrdenNoRealizadaAgendaRequest(servicioOrden.id_orden_trabajo, {
+          motivo: servicioForm.motivo || "Servicio no realizado desde agenda",
+        });
+        toast.success("Servicio marcado como no realizado");
+      }
+
+      setServicioOrden(null);
+      await loadAgenda(fecha);
+    } catch (err) {
+      const message = err?.response?.data?.error || "No se pudo actualizar el servicio";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCobroSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!cobroOrden) return;
+
+    try {
+      setActionLoading(true);
+      const monto = Number(cobroForm.monto || cobroOrden.total_orden || 0);
+
+      if (cobroForm.tipo === "PAGADO") {
+        await createPagoRequest({
+          id_cliente: cobroOrden.id_cliente,
+          id_orden_trabajo: cobroOrden.id_orden_trabajo,
+          fecha_pago: fecha,
+          metodo_pago: cobroForm.metodo_pago,
+          monto,
+          referencia_pago: cobroForm.referencia_pago || null,
+          observaciones: cobroForm.observaciones || "Pago registrado desde agenda",
+        });
+        toast.success("Pago registrado");
+      }
+
+      if (cobroForm.tipo === "CREDITO") {
+        const vencimiento = new Date(`${fecha}T00:00:00`);
+        vencimiento.setDate(vencimiento.getDate() + Number(cobroForm.dias_credito || 0));
+        await createCreditoRequest({
+          id_cliente: cobroOrden.id_cliente,
+          id_orden_trabajo: cobroOrden.id_orden_trabajo,
+          monto_total: monto,
+          monto_pagado: 0,
+          dias_credito: Number(cobroForm.dias_credito || 0),
+          fecha_inicio_credito: fecha,
+          fecha_vencimiento: vencimiento.toISOString().slice(0, 10),
+          observaciones: cobroForm.observaciones || "Credito creado desde agenda",
+        });
+        toast.success("Credito creado");
+      }
+
+      if (cobroForm.tipo === "NO_COBRADO") {
+        toast.info("La orden queda como no cobrada");
+      }
+
+      setCobroOrden(null);
+      await loadAgenda(fecha);
+    } catch (err) {
+      const message = err?.response?.data?.error || "No se pudo actualizar el cobro";
       setError(message);
       toast.error(message);
     } finally {
@@ -232,6 +397,27 @@ const AgendaHoyPage = () => {
         key: "total_orden",
         label: t("agenda.total"),
         render: (row) => formatCurrency(row.total_orden),
+      },
+      {
+        key: "estado_cobro",
+        label: "Cobro",
+        render: (row) => {
+          const styles = {
+            PAGADO: "bg-green-100 text-green-700",
+            CREDITO: "bg-amber-100 text-amber-700",
+            NO_COBRADO: "bg-slate-100 text-slate-700",
+          };
+          const labels = {
+            PAGADO: "Pagado",
+            CREDITO: "Credito",
+            NO_COBRADO: "No cobrado",
+          };
+          return (
+            <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${styles[row.estado_cobro] || styles.NO_COBRADO}`}>
+              {labels[row.estado_cobro] || labels.NO_COBRADO}
+            </span>
+          );
+        },
       },
     ],
     [t]
@@ -348,17 +534,6 @@ const AgendaHoyPage = () => {
         {t("agenda.viewSchedule")}
       </button>
 
-      {!row.id_ejecucion_dia ? (
-        <button
-          type="button"
-          onClick={() => handleGenerarVisita(row)}
-          disabled={actionLoading}
-          className="rounded-lg border px-3 py-1.5 text-xs text-sky-700 hover:bg-sky-50 disabled:opacity-60"
-        >
-          {t("agenda.generateVisit")}
-        </button>
-      ) : null}
-
       {row.id_ejecucion_dia && row.estado_visita_actual === "PENDIENTE" && !row.id_orden_trabajo_visita ? (
         <button
           type="button"
@@ -378,6 +553,38 @@ const AgendaHoyPage = () => {
         >
           {t("agenda.viewOrder")}
         </button>
+      ) : null}
+
+      {!row.id_orden_trabajo_visita && !row.id_ejecucion_dia ? (
+        <button
+          type="button"
+          onClick={() => handleGenerarOrdenDirecta(row)}
+          disabled={actionLoading}
+          className="rounded-lg border px-3 py-1.5 text-xs text-sky-700 hover:bg-sky-50 disabled:opacity-60"
+        >
+          {t("agenda.generateOrder")}
+        </button>
+      ) : null}
+
+      {row.id_orden_trabajo_visita ? (
+        <>
+          <button
+            type="button"
+            onClick={() => openCobroModal(normalizeScheduleOrder(row))}
+            disabled={actionLoading}
+            className="rounded-lg border px-3 py-1.5 text-xs text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+          >
+            Cobrar
+          </button>
+          <button
+            type="button"
+            onClick={() => openServicioModal(normalizeScheduleOrder(row))}
+            disabled={actionLoading || ["COMPLETADA", "CANCELADA"].includes(row.estado_orden_visita)}
+            className="rounded-lg border px-3 py-1.5 text-xs text-violet-700 hover:bg-violet-50 disabled:opacity-60"
+          >
+            Servicio
+          </button>
+        </>
       ) : null}
     </div>
   );
@@ -401,6 +608,22 @@ const AgendaHoyPage = () => {
         className="rounded-lg border px-3 py-1.5 text-xs hover:bg-slate-50"
       >
         {t("agenda.viewOrder")}
+      </button>
+      <button
+        type="button"
+        onClick={() => openCobroModal(row)}
+        disabled={actionLoading}
+        className="rounded-lg border px-3 py-1.5 text-xs text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+      >
+        Cobrar
+      </button>
+      <button
+        type="button"
+        onClick={() => openServicioModal(row)}
+        disabled={actionLoading || ["COMPLETADA", "CANCELADA"].includes(row.estado)}
+        className="rounded-lg border px-3 py-1.5 text-xs text-violet-700 hover:bg-violet-50 disabled:opacity-60"
+      >
+        Servicio
       </button>
     </div>
   );
@@ -646,6 +869,229 @@ const AgendaHoyPage = () => {
           </section>
         </>
       )}
+
+      {cobroOrden ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4">
+          <form onSubmit={handleCobroSubmit} className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Cobro de orden</h2>
+                <p className="text-sm text-slate-500">
+                  {cobroOrden.numero_orden} - {cobroOrden.cliente}
+                </p>
+              </div>
+              <button type="button" onClick={() => setCobroOrden(null)} className="rounded-lg border px-3 py-1 text-sm">
+                Cerrar
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-3">
+              <select
+                value={cobroForm.tipo}
+                onChange={(event) => setCobroForm((prev) => ({ ...prev, tipo: event.target.value }))}
+                className="rounded-xl border px-4 py-3"
+              >
+                <option value="PAGADO">Pagado</option>
+                <option value="NO_COBRADO">No pagado / no cobrado</option>
+                <option value="CREDITO">Credito para cliente</option>
+              </select>
+
+              {cobroForm.tipo !== "NO_COBRADO" ? (
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={cobroForm.monto}
+                  onChange={(event) => setCobroForm((prev) => ({ ...prev, monto: event.target.value }))}
+                  className="rounded-xl border px-4 py-3"
+                  placeholder="Monto"
+                />
+              ) : null}
+
+              {cobroForm.tipo === "PAGADO" ? (
+                <>
+                  <select
+                    value={cobroForm.metodo_pago}
+                    onChange={(event) => setCobroForm((prev) => ({ ...prev, metodo_pago: event.target.value }))}
+                    className="rounded-xl border px-4 py-3"
+                  >
+                    {PAYMENT_METHODS.map((method) => (
+                      <option key={method} value={method}>
+                        {method}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    value={cobroForm.referencia_pago}
+                    onChange={(event) => setCobroForm((prev) => ({ ...prev, referencia_pago: event.target.value }))}
+                    className="rounded-xl border px-4 py-3"
+                    placeholder="Referencia"
+                  />
+                </>
+              ) : null}
+
+              {cobroForm.tipo === "CREDITO" ? (
+                <input
+                  type="number"
+                  min="0"
+                  value={cobroForm.dias_credito}
+                  onChange={(event) => setCobroForm((prev) => ({ ...prev, dias_credito: event.target.value }))}
+                  className="rounded-xl border px-4 py-3"
+                  placeholder="Dias de credito"
+                />
+              ) : null}
+
+              <textarea
+                value={cobroForm.observaciones}
+                onChange={(event) => setCobroForm((prev) => ({ ...prev, observaciones: event.target.value }))}
+                rows={3}
+                className="rounded-xl border px-4 py-3"
+                placeholder="Observaciones"
+              />
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setCobroOrden(null)} className="rounded-xl border px-4 py-2">
+                Cancelar
+              </button>
+              <button disabled={actionLoading} className="rounded-xl bg-slate-900 px-4 py-2 text-white disabled:opacity-60">
+                Guardar
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
+      {servicioOrden ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4">
+          <form onSubmit={handleServicioSubmit} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Resultado del servicio</h2>
+                <p className="text-sm text-slate-500">
+                  {servicioOrden.numero_orden} - {servicioOrden.cliente}
+                </p>
+              </div>
+              <button type="button" onClick={() => setServicioOrden(null)} className="rounded-lg border px-3 py-1 text-sm">
+                Cerrar
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-3">
+              <select
+                value={servicioForm.accion}
+                onChange={(event) => {
+                  const accion = event.target.value;
+                  setServicioForm((prev) => ({ ...prev, accion }));
+                  if (accion !== "REPROGRAMAR") {
+                    setReprogramacionPreview(null);
+                  }
+                }}
+                className="rounded-xl border px-4 py-3"
+              >
+                <option value="REALIZADO">Se realizó el servicio</option>
+                <option value="REPROGRAMAR">No se realizó, reprogramar</option>
+                <option value="NO_REALIZADO">No se realizó y esperar siguiente fecha</option>
+              </select>
+
+              {servicioForm.accion === "REPROGRAMAR" ? (
+                <>
+                  <input
+                    type="date"
+                    value={servicioForm.nueva_fecha}
+                    onChange={(event) => {
+                      const nuevaFecha = event.target.value;
+                      setServicioForm((prev) => ({ ...prev, nueva_fecha: nuevaFecha }));
+                      loadReprogramacionPreview(nuevaFecha);
+                    }}
+                    className="rounded-xl border px-4 py-3"
+                  />
+                  <textarea
+                    value={servicioForm.motivo}
+                    onChange={(event) => setServicioForm((prev) => ({ ...prev, motivo: event.target.value }))}
+                    rows={3}
+                    className="rounded-xl border px-4 py-3"
+                    placeholder="Motivo de reprogramacion"
+                  />
+
+                  <section className="rounded-2xl border bg-slate-50 p-4">
+                    <h3 className="text-sm font-semibold text-slate-900">Carga del día seleccionado</h3>
+                    {previewLoading ? (
+                      <p className="mt-2 text-sm text-slate-500">Cargando agenda...</p>
+                    ) : reprogramacionPreview ? (
+                      <div className="mt-3 space-y-3">
+                        <div className="grid gap-2 sm:grid-cols-3">
+                          <div className="rounded-xl bg-white p-3">
+                            <p className="text-xs text-slate-500">Programaciones</p>
+                            <p className="text-lg font-semibold">{reprogramacionPreview.resumen?.total_programaciones || 0}</p>
+                          </div>
+                          <div className="rounded-xl bg-white p-3">
+                            <p className="text-xs text-slate-500">Ordenes</p>
+                            <p className="text-lg font-semibold">{reprogramacionPreview.resumen?.total_ordenes || 0}</p>
+                          </div>
+                          <div className="rounded-xl bg-white p-3">
+                            <p className="text-xs text-slate-500">Vencidas</p>
+                            <p className="text-lg font-semibold">{reprogramacionPreview.resumen?.total_programaciones_vencidas || 0}</p>
+                          </div>
+                        </div>
+
+                        <div className="max-h-52 overflow-y-auto rounded-xl bg-white">
+                          {[...(reprogramacionPreview.programaciones || []), ...(reprogramacionPreview.ordenes || [])].length ? (
+                            [...(reprogramacionPreview.programaciones || []), ...(reprogramacionPreview.ordenes || [])].map((item, index) => (
+                              <div key={`${item.id_programacion || item.id_orden_trabajo}-${index}`} className="border-b px-3 py-2 text-sm last:border-b-0">
+                                <p className="font-medium text-slate-900">{item.cliente}</p>
+                                <p className="text-slate-500">
+                                  {item.servicio || item.numero_orden} - {item.nombre_propiedad || "Sin propiedad"} - {item.hora_programada || item.hora_inicio_programada || "Sin hora"}
+                                </p>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="p-3 text-sm text-slate-500">No hay programaciones u ordenes para ese dia.</p>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-sm text-slate-500">Selecciona una fecha para ver la carga.</p>
+                    )}
+                  </section>
+                </>
+              ) : null}
+
+              {servicioForm.accion === "NO_REALIZADO" ? (
+                <textarea
+                  value={servicioForm.motivo}
+                  onChange={(event) => setServicioForm((prev) => ({ ...prev, motivo: event.target.value }))}
+                  rows={3}
+                  className="rounded-xl border px-4 py-3"
+                  placeholder="Motivo por el que no se realizó"
+                />
+              ) : null}
+
+              {servicioForm.accion === "NO_REALIZADO" ? (
+                <div className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  Se cancelará esta orden y la programación recurrente avanzará a su próxima fecha normal.
+                </div>
+              ) : null}
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setServicioOrden(null)} className="rounded-xl border px-4 py-2">
+                Cancelar
+              </button>
+              <button
+                disabled={
+                  actionLoading ||
+                  (servicioForm.accion === "REPROGRAMAR" && !servicioForm.nueva_fecha) ||
+                  (["REPROGRAMAR", "NO_REALIZADO"].includes(servicioForm.accion) && !servicioForm.motivo.trim())
+                }
+                className="rounded-xl bg-slate-900 px-4 py-2 text-white disabled:opacity-60"
+              >
+                Guardar
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </div>
   );
 };

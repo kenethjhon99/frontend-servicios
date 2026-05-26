@@ -51,7 +51,7 @@ const buildState = (initialData) => {
       : "",
     frecuencia: initialData.frecuencia || "SEMANAL",
     fecha_inicio: initialData.fecha_inicio || "",
-    hora_programada: initialData.hora_programada || "",
+    hora_programada: "",
     proxima_fecha: initialData.proxima_fecha || "",
     duracion_estimada_min: initialData.duracion_estimada_min
       ? String(initialData.duracion_estimada_min)
@@ -455,20 +455,12 @@ const ProgramacionForm = ({
                 />
 
                 <input
-                  type="time"
-                  name="hora_programada"
-                  value={form.hora_programada}
-                  onChange={handleChange}
-                  className="rounded-xl border px-4 py-3"
-                />
-
-                <input
                   type="number"
                   name="duracion_estimada_min"
                   value={form.duracion_estimada_min}
                   onChange={handleChange}
                   placeholder={t("schedules.form.durationPlaceholder")}
-                  className="rounded-xl border px-4 py-3 md:col-span-2"
+                  className="rounded-xl border px-4 py-3"
                 />
               </div>
             </section>

@@ -8,7 +8,7 @@ vi.mock("../../src/api/agenda.api", () => ({
 }));
 
 vi.mock("../../src/api/programaciones.api", () => ({
-  generarEjecucionProgramacionRequest: vi.fn(),
+  generarOrdenDesdeProgramacionRequest: vi.fn(),
   generarOrdenDesdeEjecucionProgramacionRequest: vi.fn(),
 }));
 
@@ -25,7 +25,7 @@ vi.mock("../../src/utils/csv", () => ({
 
 import { getAgendaRangoRequest } from "../../src/api/agenda.api";
 import {
-  generarEjecucionProgramacionRequest,
+  generarOrdenDesdeProgramacionRequest,
   generarOrdenDesdeEjecucionProgramacionRequest,
 } from "../../src/api/programaciones.api";
 import { downloadAgendaSemanalCsv } from "../../src/utils/csv";
@@ -43,7 +43,7 @@ describe("AgendaSemanalPage", () => {
 
   beforeEach(() => {
     getAgendaRangoRequest.mockReset();
-    generarEjecucionProgramacionRequest.mockReset();
+    generarOrdenDesdeProgramacionRequest.mockReset();
     generarOrdenDesdeEjecucionProgramacionRequest.mockReset();
     downloadAgendaSemanalCsv.mockReset();
     window.print = vi.fn();
@@ -114,7 +114,7 @@ describe("AgendaSemanalPage", () => {
     );
   });
 
-  it("filtra por responsable y genera visita desde la semana", async () => {
+  it("filtra por responsable y genera orden directa desde la semana", async () => {
     getAgendaRangoRequest.mockResolvedValue({
       fecha_desde: "2026-05-11",
       fecha_hasta: "2026-05-17",
@@ -150,7 +150,7 @@ describe("AgendaSemanalPage", () => {
         total_ordenes: 0,
       },
     });
-    generarEjecucionProgramacionRequest.mockResolvedValue({ id_ejecucion: 9 });
+    generarOrdenDesdeProgramacionRequest.mockResolvedValue({ id_orden_trabajo: 9 });
 
     renderPage();
 
@@ -165,10 +165,10 @@ describe("AgendaSemanalPage", () => {
     expect(screen.getAllByText("Client One").length).toBeGreaterThan(0);
     expect(screen.queryByText("Client Two")).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: /Generate visit|Generar visita/i }));
+    await userEvent.click(screen.getByRole("button", { name: /Generate order|Generar orden/i }));
 
     await waitFor(() =>
-      expect(generarEjecucionProgramacionRequest).toHaveBeenCalledWith(1),
+      expect(generarOrdenDesdeProgramacionRequest).toHaveBeenCalledWith(1),
     );
   });
 

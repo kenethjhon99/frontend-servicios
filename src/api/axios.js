@@ -4,15 +4,33 @@ const api = axios.create({
   baseURL:
     import.meta.env.VITE_API_URL ||
     (import.meta.env.DEV ? "http://localhost:3000/api" : "/api"),
+  withCredentials: true,
 });
 
-// Request: adjunta el token si existe
+const unsafeMethods = ["post", "put", "patch", "delete"];
+
+const readCookie = (name) => {
+  if (typeof document === "undefined") return "";
+
+  return (
+    document.cookie
+      .split(";")
+      .map((part) => part.trim())
+      .find((part) => part.startsWith(`${name}=`))
+      ?.split("=")
+      .slice(1)
+      .join("=") || ""
+  );
+};
+
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
   const locale = localStorage.getItem("codanova-language") || "en";
 
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  if (unsafeMethods.includes(String(config.method).toLowerCase())) {
+    const csrfToken = readCookie("sm_csrf");
+    if (csrfToken) {
+      config.headers["X-CSRF-Token"] = decodeURIComponent(csrfToken);
+    }
   }
 
   config.headers["X-App-Locale"] = locale;
@@ -20,29 +38,31 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Response: si el backend responde 401 (token inválido o expirado),
-// limpia el token y redirige a /login. Evita el bucle de errores
-// silenciosos cuando el JWT vence (8h por default).
-//
-// Excepciones:
-//  - El propio /auth/login responde 401 con credenciales inválidas;
-//    en ese caso NO redirigimos (LoginPage muestra el error inline).
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     const status = error?.response?.status;
     const url = error?.config?.url || "";
+    const originalRequest = error?.config;
     const isLoginCall = url.includes("/auth/login");
+    const isRefreshCall = url.includes("/auth/refresh");
+    const isLogoutCall = url.includes("/auth/logout");
 
-    if (status === 401 && !isLoginCall) {
-      const hadToken = !!localStorage.getItem("token");
-      localStorage.removeItem("token");
+    if (status === 401 && !isLoginCall && !isRefreshCall && !isLogoutCall && !originalRequest?._retry) {
+      originalRequest._retry = true;
 
-      // Sólo redirigir si había sesión activa y no estamos ya en /login,
-      // para no entrar en loops cuando el primer perfilRequest falla.
-      if (hadToken && window.location.pathname !== "/login") {
-        window.location.href = "/login";
+      try {
+        await api.post("/auth/refresh");
+        return api(originalRequest);
+      } catch (_refreshError) {
+        if (window.location.pathname !== "/login") {
+          window.location.href = "/login";
+        }
       }
+    }
+
+    if (status === 401 && isRefreshCall && window.location.pathname !== "/login") {
+      window.location.href = "/login";
     }
 
     return Promise.reject(error);

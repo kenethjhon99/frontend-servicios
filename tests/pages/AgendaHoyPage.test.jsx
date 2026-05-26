@@ -8,7 +8,7 @@ vi.mock("../../src/api/agenda.api", () => ({
 }));
 
 vi.mock("../../src/api/programaciones.api", () => ({
-  generarEjecucionProgramacionRequest: vi.fn(),
+  generarOrdenDesdeProgramacionRequest: vi.fn(),
   generarOrdenDesdeEjecucionProgramacionRequest: vi.fn(),
 }));
 
@@ -23,7 +23,7 @@ vi.mock("../../src/context/toast.context", () => ({
 
 import { getAgendaDiaRequest } from "../../src/api/agenda.api";
 import {
-  generarEjecucionProgramacionRequest,
+  generarOrdenDesdeProgramacionRequest,
   generarOrdenDesdeEjecucionProgramacionRequest,
 } from "../../src/api/programaciones.api";
 import { changeEstadoOrdenRequest } from "../../src/api/ordenes.api";
@@ -43,7 +43,7 @@ const renderPage = () =>
 describe("AgendaHoyPage", () => {
   beforeEach(() => {
     getAgendaDiaRequest.mockReset();
-    generarEjecucionProgramacionRequest.mockReset();
+    generarOrdenDesdeProgramacionRequest.mockReset();
     generarOrdenDesdeEjecucionProgramacionRequest.mockReset();
     changeEstadoOrdenRequest.mockReset();
   });
@@ -249,15 +249,15 @@ describe("AgendaHoyPage", () => {
         ordenes: [],
         vencimientos_credito: [],
       });
-    generarEjecucionProgramacionRequest.mockResolvedValue({ id_ejecucion: 44 });
+    generarOrdenDesdeProgramacionRequest.mockResolvedValue({ id_orden_trabajo: 44 });
 
     renderPage();
 
     await waitFor(() => expect(screen.getByText("Client Three")).toBeInTheDocument());
-    await userEvent.click(screen.getByRole("button", { name: /Generate visit|Generar visita/i }));
+    await userEvent.click(screen.getByRole("button", { name: /Generate order|Generar orden/i }));
 
     await waitFor(() =>
-      expect(generarEjecucionProgramacionRequest).toHaveBeenCalledWith(2)
+      expect(generarOrdenDesdeProgramacionRequest).toHaveBeenCalledWith(2)
     );
     await waitFor(() => expect(getAgendaDiaRequest).toHaveBeenCalledTimes(2));
   });

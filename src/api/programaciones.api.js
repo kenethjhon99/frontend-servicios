@@ -36,6 +36,11 @@ export const generarEjecucionProgramacionRequest = async (id, data = {}) => {
   return res.data;
 };
 
+export const generarOrdenDesdeProgramacionRequest = async (id) => {
+  const res = await api.post(`/programaciones/${id}/generar-orden`);
+  return res.data;
+};
+
 export const reprogramarEjecucionProgramacionRequest = async (id, data) => {
   const res = await api.post(`/programaciones/ejecuciones/${id}/reprogramar`, data);
   return res.data;

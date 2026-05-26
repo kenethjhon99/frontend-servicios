@@ -1,42 +1,39 @@
-import { useEffect, useMemo, useState } from "react";
-import { loginRequest, perfilRequest } from "../api/auth.api";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { loginRequest, logoutRequest, perfilRequest } from "../api/auth.api";
 import { AuthContext } from "./auth.context";
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const login = async (credentials) => {
+  const login = useCallback(async (credentials) => {
     const data = await loginRequest(credentials);
-    localStorage.setItem("token", data.token);
     setUser(data.usuario);
     return data.usuario;
-  };
+  }, []);
 
-  const logout = () => {
-    localStorage.removeItem("token");
-    setUser(null);
-  };
+  const logout = useCallback(async () => {
+    try {
+      await logoutRequest();
+    } finally {
+      setUser(null);
+      localStorage.removeItem("token");
+    }
+  }, []);
 
   useEffect(() => {
     const loadProfile = async () => {
       try {
-        const token = localStorage.getItem("token");
-
-        if (!token) {
-          setLoading(false);
-          return;
-        }
-
+        localStorage.removeItem("token");
         const data = await perfilRequest();
         setUser(data.usuario);
       } catch (_err) {
-        localStorage.removeItem("token");
         setUser(null);
       } finally {
         setLoading(false);
       }
     };
+
     loadProfile();
   }, []);
 
@@ -48,7 +45,7 @@ export const AuthProvider = ({ children }) => {
       logout,
       isAuthenticated: !!user,
     }),
-    [user, loading]
+    [user, loading, login, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

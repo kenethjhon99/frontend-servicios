@@ -39,3 +39,13 @@ export const getVencimientosCreditoRequest = async ({
 
   return res.data;
 };
+
+export const reprogramarOrdenAgendaRequest = async (id, data) => {
+  const res = await api.post(`/agenda/ordenes/${id}/reprogramar`, data);
+  return res.data;
+};
+
+export const marcarOrdenNoRealizadaAgendaRequest = async (id, data) => {
+  const res = await api.post(`/agenda/ordenes/${id}/no-realizada`, data);
+  return res.data;
+};

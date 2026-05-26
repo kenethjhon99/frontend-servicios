@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAgendaRangoRequest } from "../../api/agenda.api";
 import {
-  generarEjecucionProgramacionRequest,
+  generarOrdenDesdeProgramacionRequest,
   generarOrdenDesdeEjecucionProgramacionRequest,
 } from "../../api/programaciones.api";
 import EmptyState from "../../components/common/EmptyState";
@@ -114,14 +114,14 @@ const AgendaSemanalPage = () => {
     }
   };
 
-  const handleGenerarVisita = async (row) => {
+  const handleGenerarOrdenDirecta = async (row) => {
     try {
       setActionLoading(true);
-      await generarEjecucionProgramacionRequest(row.id_programacion);
-      toast.success(t("agenda.generateVisitSuccess"));
+      await generarOrdenDesdeProgramacionRequest(row.id_programacion);
+      toast.success(t("agenda.generateOrderSuccess"));
       await loadAgenda(filters);
     } catch (err) {
-      const message = err?.response?.data?.error || t("agenda.generateVisitError");
+      const message = err?.response?.data?.error || t("agenda.generateOrderError");
       setError(message);
       toast.error(message);
     } finally {
@@ -591,14 +591,14 @@ const AgendaSemanalPage = () => {
                                     >
                                       {t("agenda.viewSchedule")}
                                     </button>
-                                    {!row.id_ejecucion_actual ? (
+                                    {!row.id_ejecucion_actual && !row.id_orden_trabajo_visita ? (
                                       <button
                                         type="button"
-                                        onClick={() => handleGenerarVisita(row)}
+                                        onClick={() => handleGenerarOrdenDirecta(row)}
                                         disabled={actionLoading}
                                         className="print-hidden rounded-lg border px-2.5 py-1 text-[11px] text-sky-700 hover:bg-sky-50 disabled:opacity-60"
                                       >
-                                        {t("agenda.generateVisit")}
+                                        {t("agenda.generateOrder")}
                                       </button>
                                     ) : null}
                                     {row.id_ejecucion_actual && !row.id_orden_trabajo_visita ? (

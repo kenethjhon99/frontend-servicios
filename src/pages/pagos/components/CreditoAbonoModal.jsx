@@ -35,6 +35,7 @@ const CreditoAbonoModal = ({
         >
           <option value="EFECTIVO">EFECTIVO</option>
           <option value="TRANSFERENCIA">TRANSFERENCIA</option>
+          <option value="CHEQUE">CHEQUE</option>
           <option value="DEPOSITO">DEPOSITO</option>
           <option value="TARJETA">TARJETA</option>
           <option value="OTRO">OTRO</option>

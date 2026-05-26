@@ -6,6 +6,7 @@ import { MemoryRouter } from "react-router-dom";
 // Mock del módulo de api antes de importar nada que lo use.
 vi.mock("../../src/api/auth.api", () => ({
   loginRequest: vi.fn(),
+  logoutRequest: vi.fn(),
   perfilRequest: vi.fn(() => Promise.reject(new Error("no token"))),
 }));
 
@@ -58,9 +59,8 @@ describe("LoginPage", () => {
     expect(passInput).toHaveValue("secreto123");
   });
 
-  it("login exitoso → guarda token, setea user y navega a '/'", async () => {
+  it("login exitoso → setea user sin guardar token y navega a '/'", async () => {
     loginRequest.mockResolvedValueOnce({
-      token: "tok-abc",
       usuario: { id_usuario: 1, username: "admin", rol: "ADMIN" },
     });
 
@@ -76,7 +76,7 @@ describe("LoginPage", () => {
         password: "Password123",
       })
     );
-    expect(localStorage.getItem("token")).toBe("tok-abc");
+    expect(localStorage.getItem("token")).toBeNull();
     expect(mockNavigate).toHaveBeenCalledWith("/");
   });
 
@@ -131,7 +131,6 @@ describe("LoginPage", () => {
 
     // Liberar la promesa
     resolveLogin({
-      token: "x",
       usuario: { id_usuario: 1, username: "admin", rol: "ADMIN" },
     });
 
